@@ -1,0 +1,77 @@
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+
+# Load current quiz data
+current_quiz_data = pd.read_json('current_quiz_data.json')
+
+# Load historical quiz data
+historical_quiz_data = pd.read_json('historical_quiz_data.json')
+
+# Analyze current quiz performance
+def analyze_current_quiz(data):
+    # Calculate accuracy per topic
+    topic_accuracy = data.groupby('topic')['is_correct'].mean()
+    # Calculate average time per question
+    avg_time_per_question = data['time_taken'].mean()
+    return topic_accuracy, avg_time_per_question
+
+# Analyze historical performance
+def analyze_historical_performance(data):
+    # Calculate average score per quiz
+    avg_scores = data.groupby('quiz_id')['score'].mean()
+    # Calculate accuracy per topic over time
+    topic_accuracy_over_time = data.groupby(['quiz_id', 'topic'])['is_correct'].mean().unstack()
+    return avg_scores, topic_accuracy_over_time
+
+# Generate insights
+def generate_insights(current_topic_accuracy, historical_topic_accuracy):
+    insights = {}
+    for topic in current_topic_accuracy.index:
+        if current_topic_accuracy[topic] < 0.5:
+            insights[topic] = 'Weak Area'
+        elif current_topic_accuracy[topic] > historical_topic_accuracy[topic].mean():
+            insights[topic] = 'Improving'
+        else:
+            insights[topic] = 'Needs Attention'
+    return insights
+
+# Provide recommendations
+def provide_recommendations(insights):
+    recommendations = []
+    for topic, status in insights.items():
+        if status == 'Weak Area':
+            recommendations.append(f"Focus more on {topic}.")
+        elif status == 'Needs Attention':
+            recommendations.append(f"Review {topic} to improve performance.")
+    return recommendations
+
+# Predict NEET rank
+def predict_neet_rank(historical_neet_data, student_score):
+    X = historical_neet_data['score'].values.reshape(-1, 1)
+    y = historical_neet_data['rank'].values
+    model = LinearRegression()
+    model.fit(X, y)
+    predicted_rank = model.predict(np.array([[student_score]]))
+    return predicted_rank[0]
+
+# Main function
+def main():
+    current_topic_accuracy, avg_time = analyze_current_quiz(current_quiz_data)
+    _, historical_topic_accuracy = analyze_historical_performance(historical_quiz_data)
+    insights = generate_insights(current_topic_accuracy, historical_topic_accuracy)
+    recommendations = provide_recommendations(insights)
+    
+    print("Personalized Recommendations:")
+    for rec in recommendations:
+        print(rec)
+    
+    # Predict NEET rank
+    historical_neet_data = pd.read_csv('historical_neet_data.csv')
+    student_score = current_quiz_data['score'].sum()
+    estimated_rank = predict_neet_rank(historical_neet_data, student_score)
+    print(f"Estimated NEET Rank: {estimated_rank:.0f}")
+
+if __name__ == "__main__":
+    main()
